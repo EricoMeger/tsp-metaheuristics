@@ -112,6 +112,7 @@ class TSPUtils:
             if not improved:
                 no_improve += 1
         return tour
+
 class DestroyOperators:
 
     @staticmethod
@@ -215,22 +216,19 @@ class DestroyOperators:
         
         return [], new_tour
 
-class MCTSNode:
-    __slots__ = ['action_idx', 'parent', 'children', 'visits', 'total_reward']
+class BanditArm:
+    __slots__ = ['action_idx', 'successes', 'failures', 'visits']
     
-    def __init__(self, action_idx=None, parent=None):
+    def __init__(self, action_idx):
         self.action_idx = action_idx
-        self.parent = parent
-        self.children = []
+        self.successes = 1.0
+        self.failures = 1.0
         self.visits = 0
-        self.total_reward = 0.0
 
-    def avg_reward(self):
-        if self.visits == 0:
-            return 0.0
-        return self.total_reward / self.visits
+    def sample_thompson(self):
+        return random.betavariate(self.successes, self.failures)
 
-class MCTS_LNS:
+class MAB_LNS:
 
     def __init__(self,
                  distance_matrix,
@@ -239,7 +237,6 @@ class MCTS_LNS:
                  R_repairs=10,
                  top_k_insert=3,
                  noise_prob=0.15,
-                 uct_c=1.4,
                  remove_frac=0.20):
         self.dist = distance_matrix
         self.n = n_nodes
@@ -247,7 +244,6 @@ class MCTS_LNS:
         self.R = R_repairs
         self.top_k_insert = top_k_insert
         self.noise_prob = noise_prob
-        self.uct_c = uct_c
         self.remove_frac = remove_frac
 
         self.actions = [
@@ -258,6 +254,8 @@ class MCTS_LNS:
             ("related", self._destroy_related),
             ("segment", self._destroy_segment),
         ]
+        
+        self.arms = [BanditArm(i) for i in range(len(self.actions))]
 
     def _destroy_block(self, tour):
         k = max(2, int(self.remove_frac * self.n))
@@ -305,11 +303,6 @@ class MCTS_LNS:
         best = current[:]
         best_cost = current_cost
 
-        root = MCTSNode(action_idx=None, parent=None)
-        for i in range(len(self.actions)):
-            child = MCTSNode(action_idx=i, parent=root)
-            root.children.append(child)
-
         temperature = best_cost * 0.03
         cooling_rate = 0.9998
 
@@ -320,12 +313,12 @@ class MCTS_LNS:
         while time.time() - start_time < self.time_limit:
             iter_count += 1
 
-            child = self._select_uct(root)
-            action_idx = child.action_idx
+            arm = self._select_thompson()
+            action_idx = arm.action_idx
 
-            reward, sol_candidate, cand_cost = self._rollout(current, action_idx)
+            reward, sol_candidate, cand_cost = self._apply_operator(current, current_cost, action_idx)
 
-            self._backprop(child, reward)
+            self._update_arm(arm, reward)
 
             delta = cand_cost - current_cost
             if delta < 0 or random.random() < math.exp(-delta / max(temperature, 1e-10)):
@@ -353,28 +346,15 @@ class MCTS_LNS:
                 temperature = best_cost * 0.02
                 no_improve = 0
 
-        print(f"MCTS-LNS done. iterations: {iter_count}, best: {best_cost:.2f}")
+        print(f"MAB-LNS done. iterations: {iter_count}, best: {best_cost:.2f}")
+        self._print_arm_stats()
         return best, best_cost
 
-    def _select_uct(self, root):
-        best_score = -float("inf")
-        best_child = None
-        
-        for child in root.children:
-            if child.visits == 0:
-                return child 
-            
-            exploit = child.avg_reward()
-            explore = self.uct_c * math.sqrt(math.log(root.visits + 1) / child.visits)
-            score = exploit + explore
-            
-            if score > best_score:
-                best_score = score
-                best_child = child
-        
-        return best_child
+    def _select_thompson(self):
+        samples = [(arm.sample_thompson(), arm) for arm in self.arms]
+        return max(samples, key=lambda x: x[0])[1]
 
-    def _rollout(self, current_tour, action_idx):
+    def _apply_operator(self, current_tour, current_cost, action_idx):
         _, action_func = self.actions[action_idx]
         
         removed, remaining = action_func(current_tour)
@@ -382,7 +362,8 @@ class MCTS_LNS:
         if len(removed) == 0 and len(remaining) == len(current_tour):
             candidate = TSPUtils.two_opt_limited(remaining, self.dist, max_no_improve=30)
             cost = TSPUtils.tour_cost(candidate, self.dist)
-            reward = -cost
+            improvement = current_cost - cost
+            reward = improvement / max(current_cost, 1e-10)
             return reward, candidate, cost
 
         best_sol = None
@@ -403,26 +384,35 @@ class MCTS_LNS:
                 best_cost = cost
                 best_sol = cand
 
-        reward = -best_cost
+        improvement = current_cost - best_cost
+        reward = improvement / max(current_cost, 1e-10)
         return reward, best_sol, best_cost
 
-    def _backprop(self, node, reward):
-        cur = node
-        while cur is not None:
-            cur.visits += 1
-            cur.total_reward += reward
-            cur = cur.parent
+    def _update_arm(self, arm, reward):
+        arm.visits += 1
+        
+        if reward > 0.0005:
+            arm.successes += 1
+        else:
+            arm.failures += 1
+
+    def _print_arm_stats(self):
+        print("\nArm Statistics:")
+        for arm in self.arms:
+            name = self.actions[arm.action_idx][0]
+            thompson_mean = arm.successes / (arm.successes + arm.failures)
+            print(f"  {name:15s}: visits={arm.visits:5d}, thompson_mean={thompson_mean:.3f}")
 
 if __name__ == "__main__":
     from parser import Parser
     
-    data = Parser.parse("input/200_tsp.txt")
+    data = Parser.parse("input/300_tsp.txt")
     n = data["n_clients"]
     dist = data["distance_matrix"]
 
     print(f"Loaded instance with {n} nodes")
 
-    solver = MCTS_LNS(
+    solver = MAB_LNS(
         distance_matrix=dist,
         n_nodes=n,
         time_limit=300,
