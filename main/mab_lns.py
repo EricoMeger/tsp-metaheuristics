@@ -43,37 +43,37 @@ class MAB_LNS:
         self.reward_threshold = reward_threshold
 
         self.actions = [
-            ("block", self._destroy_block),
-            ("random", self._destroy_random),
-            ("double_bridge", self._destroy_double_bridge),
-            ("worst_edges", self._destroy_worst),
-            ("related", self._destroy_related),
-            ("segment", self._destroy_segment),
+            ("block", self.destroy_block),
+            ("random", self.destroy_random),
+            ("double_bridge", self.destroy_double_bridge),
+            ("worst_edges", self.destroy_worst),
+            ("related", self.destroy_related),
+            ("segment", self.destroy_segment),
         ]
         
         self.arms = [BanditArm(i) for i in range(len(self.actions))]
 
-    def _destroy_block(self, tour):
+    def destroy_block(self, tour):
         k = max(2, int(self.remove_frac * self.n))
         return DestroyOperators.block_removal(tour, k)
 
-    def _destroy_random(self, tour):
+    def destroy_random(self, tour):
         k = max(2, int(self.remove_frac * self.n))
         return DestroyOperators.random_removal(tour, k)
 
-    def _destroy_double_bridge(self, tour):
+    def destroy_double_bridge(self, tour):
         return DestroyOperators.double_bridge(tour)
 
-    def _destroy_worst(self, tour):
+    def destroy_worst(self, tour):
         k = max(2, int(self.remove_frac * self.n))
         return DestroyOperators.worst_edges_removal(tour, self.dist, k)
 
-    def _destroy_related(self, tour):
+    def destroy_related(self, tour):
         k = max(2, int(self.remove_frac * self.n))
         start_node = random.choice(tour)
         return DestroyOperators.related_removal(tour, self.dist, k, start_node)
 
-    def _destroy_segment(self, tour):
+    def destroy_segment(self, tour):
         return DestroyOperators.segment_shuffle(tour, self.segment_num_segments)
 
     def run(self, initial_tour):
@@ -109,12 +109,12 @@ class MAB_LNS:
         while time.time() - start_time < self.time_limit:
             iter_count += 1
 
-            arm = self._select_thompson()
+            arm = self.select_thompson()
             action_idx = arm.action_idx
 
-            reward, sol_candidate, cand_cost = self._apply_operator(current, current_cost, action_idx)
+            reward, sol_candidate, cand_cost = self.apply_operator(current, current_cost, action_idx)
 
-            self._update_arm(arm, reward)
+            self.update_arm(arm, reward)
 
             delta = cand_cost - current_cost
             if delta < 0 or random.random() < math.exp(-delta / max(temperature, 1e-10)):
@@ -142,15 +142,15 @@ class MAB_LNS:
                 temperature = best_cost * self.restart_temperature_factor
                 no_improve = 0
 
-        print(f"MAB-LNS done. iterations: {iter_count}, best: {best_cost:.2f}")
-        self._print_arm_stats()
+        print(f"done. iterations: {iter_count}, best: {best_cost:.2f}")
+        self.print_arm_stats()
         return best, best_cost
 
-    def _select_thompson(self):
+    def select_thompson(self):
         samples = [(arm.sample_thompson(), arm) for arm in self.arms]
         return max(samples, key=lambda x: x[0])[1]
 
-    def _apply_operator(self, current_tour, current_cost, action_idx):
+    def apply_operator(self, current_tour, current_cost, action_idx):
         _, action_func = self.actions[action_idx]
         
         removed, remaining = action_func(current_tour)
@@ -184,7 +184,7 @@ class MAB_LNS:
         reward = improvement / max(current_cost, 1e-10)
         return reward, best_sol, best_cost
 
-    def _update_arm(self, arm, reward):
+    def update_arm(self, arm, reward):
         arm.visits += 1
         
         if reward > self.reward_threshold:
@@ -192,9 +192,8 @@ class MAB_LNS:
         else:
             arm.failures += 1
 
-    def _print_arm_stats(self):
+    def print_arm_stats(self):
         print("\nArm Statistics:")
         for arm in self.arms:
             name = self.actions[arm.action_idx][0]
-            thompson_mean = arm.successes / (arm.successes + arm.failures)
-            print(f"  {name:15s}: visits={arm.visits:5d}, thompson_mean={thompson_mean:.3f}")
+            arm.display_info(action_name=name)

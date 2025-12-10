@@ -17,11 +17,11 @@ def main():
         #number of repairs after a solution is destroyed (highe: increase exploration, but also runtime)
         R_repairs=20,
         #frac of nods removed during each iteration (higher: increase diversification, but also runtime)
-        remove_frac=0.20,
+        remove_frac=0.35,
         #at a node reinsert, consider the k best positions and choose one randomly. (higher: more diversity less greedy)
-        top_k_insert=3,
+        top_k_insert=5,
         #probability of adding noise during insertion (higher: more randomness, helps escaping local optima)
-        noise_prob=0.15,
+        noise_prob=0.25,
         
         # -- Two opt params --
         two_opt_max_iter=2000, #max iterations at the initial solution
@@ -43,13 +43,13 @@ def main():
     
     best_tour, best_cost = solver.run(initial_tour=None)
     print(f"\nBest cost: {best_cost:.2f}")
-    print(f"Tour: {best_tour}...")
+    print(f"Tour: {best_tour}")
     
     Plotter.plot_tour(
         coordinates=data["coordinates"],
         tour=best_tour,
         cost=best_cost,
-        title="Melhor rota encontrada"
+        title="best route found"
     )
 
 
