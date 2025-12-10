@@ -1,5 +1,6 @@
 from parser import Parser
 from mab_lns import MAB_LNS
+from plotter import Plotter
 
 
 def main():
@@ -42,7 +43,15 @@ def main():
     
     best_tour, best_cost = solver.run(initial_tour=None)
     print(f"\nBest cost: {best_cost:.2f}")
-    print(f"Tour: {best_tour[:20]}...")
+    print(f"Tour: {best_tour}...")
+    
+    Plotter.plot_tour(
+        coordinates=data["coordinates"],
+        tour=best_tour,
+        cost=best_cost,
+        title="Melhor rota encontrada"
+    )
+
 
 
 main()
