@@ -15,18 +15,18 @@ def main():
         n_nodes=n,
         time_limit=300,
         #number of repairs after a solution is destroyed (highe: increase exploration, but also runtime)
-        R_repairs=20,
+        R_repairs=30,
         #frac of nods removed during each iteration (higher: increase diversification, but also runtime)
-        remove_frac=0.35,
+        remove_frac=0.25,
         #at a node reinsert, consider the k best positions and choose one randomly. (higher: more diversity less greedy)
-        top_k_insert=5,
+        top_k_insert=8,
         #probability of adding noise during insertion (higher: more randomness, helps escaping local optima)
         noise_prob=0.25,
         
         # -- Two opt params --
         two_opt_max_iter=2000, #max iterations at the initial solution
-        two_opt_max_no_improve=30, #max iterations without improvement (any solution)
-        two_opt_repair_max_no_improve=20, #max iterations without improvement (repair phase)
+        two_opt_max_no_improve=50, #max iterations without improvement (any solution)
+        two_opt_repair_max_no_improve=35, #max iterations without improvement (repair phase)
         
         #for segment_removal: number of segments to divide the tour into
         segment_num_segments=4,
