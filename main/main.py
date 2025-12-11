@@ -5,7 +5,7 @@ from two_opt import two_opt
 from plot import plot_route
 
 def main():
-    path = "300_tsp.txt"
+    path = "input/200_tsp.txt"
     coords = parse_instance(path)
     dist_matrix = build_distance_matrix(coords)
 
