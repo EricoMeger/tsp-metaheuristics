@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import os
 
 class Plotter:
     @staticmethod
@@ -34,4 +35,12 @@ class Plotter:
         plt.axis('equal')
 
         plt.tight_layout()
+
+        results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
+        os.makedirs(results_dir, exist_ok=True)
+        
+        filepath = os.path.join(results_dir, f"solution_cost_{cost:.2f}.png")
+        plt.savefig(filepath, dpi=150, bbox_inches='tight')
+        print(f"image saved in: {filepath}")
+        
         plt.show()
