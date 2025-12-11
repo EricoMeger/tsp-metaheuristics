@@ -14,7 +14,7 @@ class TSPUtils:
         return cost
 
     @staticmethod
-    def stochastic_greedy_insertion(remainder, partial_tour, dist, top_k, noise_prob):
+    def cheapest_insertion_with_noise(remainder, partial_tour, dist, top_k, noise_prob):
         tour = partial_tour[:]
         cities = remainder[:]
         random.shuffle(cities)
@@ -28,7 +28,12 @@ class TSPUtils:
                 b = tour[(pos + 1) % len(tour)]
                 delta = dist[a][city] + dist[city][b] - dist[a][b]
                 candidates.append((delta, pos + 1))
-            candidates.sort(key=lambda x: x[0])
+            
+            for i in range(len(candidates)):
+                for j in range(i + 1, len(candidates)):
+                    if candidates[j][0] < candidates[i][0]:
+                        candidates[i], candidates[j] = candidates[j], candidates[i]
+            
             k = min(top_k, len(candidates))
             if random.random() < noise_prob:
                 choice = random.randrange(k)
@@ -38,7 +43,7 @@ class TSPUtils:
         return tour
 
     @staticmethod
-    def full_greedy_from_scratch(nodes, dist):
+    def nearest_neighbor_construction(nodes, dist):
         if not nodes:
             return []
         nodes_set = set(nodes)
@@ -47,9 +52,17 @@ class TSPUtils:
         nodes_set.remove(start)
         while nodes_set:
             last = tour[-1]
-            nxt = min(nodes_set, key=lambda x: dist[last][x])
-            tour.append(nxt)
-            nodes_set.remove(nxt)
+            
+            nearest_node = None
+            nearest_distance = float("inf")
+            for node in nodes_set:
+                distance = dist[last][node]
+                if distance < nearest_distance:
+                    nearest_distance = distance
+                    nearest_node = node
+            
+            tour.append(nearest_node)
+            nodes_set.remove(nearest_node)
         return tour
 
     @staticmethod

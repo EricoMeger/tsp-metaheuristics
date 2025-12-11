@@ -85,7 +85,7 @@ class MAB_LNS:
             
             for _ in range(5):
                 nodes = list(range(self.n))
-                tour = TSPUtils.full_greedy_from_scratch(nodes, self.dist)
+                tour = TSPUtils.nearest_neighbor_construction(nodes, self.dist)
                 tour = TSPUtils.two_opt(tour, self.dist, self.two_opt_max_iter)
                 cost = TSPUtils.tour_cost(tour, self.dist)
                 if cost < best_initial_cost:
@@ -147,11 +147,17 @@ class MAB_LNS:
         return best, best_cost
 
     def select_thompson(self):
-        samples = [(arm.sample_thompson(), arm) for arm in self.arms]
-        return max(samples, key=lambda x: x[0])[1]
+        best_sample = -1
+        best_arm = None
+        for arm in self.arms:
+            sample = arm.sample_thompson()
+            if sample > best_sample:
+                best_sample = sample
+                best_arm = arm
+        return best_arm
 
     def apply_operator(self, current_tour, current_cost, action_idx):
-        _, action_func = self.actions[action_idx]
+        action_name, action_func = self.actions[action_idx]
         
         removed, remaining = action_func(current_tour)
         
@@ -166,7 +172,7 @@ class MAB_LNS:
         best_cost = float("inf")
         
         for r in range(self.R):
-            cand = TSPUtils.stochastic_greedy_insertion(
+            cand = TSPUtils.cheapest_insertion_with_noise(
                 removed, remaining, self.dist,
                 self.top_k_insert, self.noise_prob
             )
@@ -186,14 +192,13 @@ class MAB_LNS:
 
     def update_arm(self, arm, reward):
         arm.visits += 1
-        
         if reward > self.reward_threshold:
-            arm.successes += 1
+            arm.successes += 1.0
         else:
-            arm.failures += 1
+            arm.failures += 1.0
 
     def print_arm_stats(self):
-        print("\nArm Statistics:")
+        print("\n=== Arm Statistics ===")
         for arm in self.arms:
-            name = self.actions[arm.action_idx][0]
-            arm.display_info(action_name=name)
+            action_name = self.actions[arm.action_idx][0]
+            arm.display_info(action_name)
